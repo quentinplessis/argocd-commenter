@@ -77,6 +77,9 @@ func (r *ApplicationHealthStatusReconciler) Reconcile(ctx context.Context, req c
 	if err := r.Notification.Deployment(ctx, e); err != nil {
 		logger.Error(err, "unable to send a deployment status")
 	}
+	if err := r.Notification.CheckRun(ctx, e); err != nil {
+		logger.Error(err, "unable to send a check run notification")
+	}
 	return ctrl.Result{}, nil
 }
 
@@ -102,7 +105,7 @@ func (applicationHealthComparer) Compare(applicationOld, applicationNew argocdv1
 
 	// notify only the following statuses
 	switch applicationNew.Status.Health.Status {
-	case health.HealthStatusHealthy, health.HealthStatusDegraded:
+	case health.HealthStatusProgressing, health.HealthStatusHealthy, health.HealthStatusDegraded:
 		revision, ok := applicationNew.Annotations[annotationNameOfLastRevisionOfHealthStatus]
 		// first time or new revision
 		if !ok || revision != lastDeployedRevision {

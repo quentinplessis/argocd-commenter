@@ -17,6 +17,7 @@ type Event struct {
 type Client interface {
 	Comment(context.Context, Event) error
 	Deployment(context.Context, Event) error
+	CheckRun(context.Context, Event) error
 }
 
 func NewClient(ghc github.Client) Client {
