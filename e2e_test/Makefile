@@ -45,13 +45,13 @@ setup-fixture:
 
 test1:
 	kubectl -n argocd annotate application app1 'argocd-commenter.int128.github.io/deployment-url=$(DEPLOYMENT_URL)'
-	kubectl -n argocd annotate application app1 'argocd-commenter.int128.github.io/check-run-url=$(CHECK_RUN_URL)'
+	kubectl -n argocd annotate application app1 'argocd-commenter.int128.github.io/commit-url=$(COMMIT_URL)'
 	$(MAKE) -C argocd-commenter-e2e-test test1
 	./wait-for-sync-status.sh app1 $(FIXTURE_BRANCH)/main Synced Succeeded Healthy
 
 test2:
 	kubectl -n argocd annotate application app2 'argocd-commenter.int128.github.io/deployment-url=$(DEPLOYMENT_URL)'
-	kubectl -n argocd annotate application app2 'argocd-commenter.int128.github.io/check-run-url=$(CHECK_RUN_URL)'
+	kubectl -n argocd annotate application app2 'argocd-commenter.int128.github.io/commit-url=$(COMMIT_URL)'
 	$(MAKE) -C argocd-commenter-e2e-test test2
 	./wait-for-sync-status.sh app2 $(FIXTURE_BRANCH)/main OutOfSync Failed Healthy
 

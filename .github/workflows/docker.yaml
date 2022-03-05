@@ -114,34 +114,22 @@ jobs:
           environment-suffix: /app2
 
       - uses: actions/github-script@v6
-        id: check-run
+        id: commit
         with:
           script: |
-            const head_sha = context.payload.pull_request?.head?.sha ?? github.sha
-            const { data: app1 } = await github.rest.checks.create({
-              ...context.repo,
-              name: `argocd / app1`,
-              head_sha,
-            })
-            core.setOutput('app1', app1.url)
-            const { data: app2 } = await github.rest.checks.create({
-              ...context.repo,
-              name: `argocd / app2`,
-              head_sha,
-            })
-            core.setOutput('app2', app2.url)
+            core.setOutput('sha', context.payload.pull_request?.head?.sha ?? github.sha)
 
       - run: make -C e2e_test test1
         env:
           PULL_REQUEST_BODY: "e2e-test ${{ github.repository }}#${{ github.event.pull_request.number }}"
           DEPLOYMENT_URL: ${{ steps.deployment-app1.outputs.url }}
-          CHECK_RUN_URL: ${{ steps.check-run.outputs.app1 }}
+          COMMIT_URL: ${{ github.api_url }}/repos/${{ github.repository }}/commits/${{ steps.commit.outputs.sha }}
           GITHUB_TOKEN: ${{ steps.octoken.outputs.token }}
       - run: make -C e2e_test test2
         env:
           PULL_REQUEST_BODY: "e2e-test ${{ github.repository }}#${{ github.event.pull_request.number }}"
           DEPLOYMENT_URL: ${{ steps.deployment-app2.outputs.url }}
-          CHECK_RUN_URL: ${{ steps.check-run.outputs.app2 }}
+          COMMIT_URL: ${{ github.api_url }}/repos/${{ github.repository }}/commits/${{ steps.commit.outputs.sha }}
           GITHUB_TOKEN: ${{ steps.octoken.outputs.token }}
 
       - run: make -C e2e_test logs-argocd

@@ -13,9 +13,9 @@ import (
 func (c client) CheckRun(ctx context.Context, e Event) error {
 	logger := logr.FromContextOrDiscard(ctx)
 
-	checkRunURL := e.Application.Annotations["argocd-commenter.int128.github.io/check-run-url"]
-	checkRunID := github.ParseCheckRunURL(checkRunURL)
-	if checkRunID == nil {
+	commitURL := e.Application.Annotations["argocd-commenter.int128.github.io/commit-url"]
+	commit := github.ParseCommitURL(commitURL)
+	if commit == nil {
 		return nil
 	}
 
@@ -25,9 +25,9 @@ func (c client) CheckRun(ctx context.Context, e Event) error {
 		return nil
 	}
 
-	logger.Info("updating the check run", "checkRun", checkRunURL)
-	if err := c.ghc.UpdateCheckRun(ctx, *checkRunID, *cr); err != nil {
-		return fmt.Errorf("unable to create a deployment status: %w", err)
+	logger.Info("updating the check run", "checkRun", commitURL)
+	if err := c.ghc.CreateCheckRun(ctx, *commit, *cr); err != nil {
+		return fmt.Errorf("unable to create a check run: %w", err)
 	}
 	return nil
 }
@@ -35,7 +35,10 @@ func (c client) CheckRun(ctx context.Context, e Event) error {
 func generateCheckRun(e Event) *github.CheckRun {
 	applicationURL := fmt.Sprintf("%s/applications/%s", e.ArgoCDURL, e.Application.Name)
 	externalURLs := strings.Join(e.Application.Status.Summary.ExternalURLs, "\n")
-	summary := fmt.Sprintf(`
+
+	var checkRun github.CheckRun
+	checkRun.Name = e.Application.Name
+	checkRun.Summary = fmt.Sprintf(`
 ## Argo CD
 %s
 
@@ -49,57 +52,43 @@ func generateCheckRun(e Event) *github.CheckRun {
 		}
 		switch e.Application.Status.OperationState.Phase {
 		case synccommon.OperationRunning:
-			return &github.CheckRun{
-				Status:  "in_progress",
-				Title:   fmt.Sprintf("Syncing: %s", e.Application.Status.OperationState.Message),
-				Summary: summary,
-			}
+			checkRun.Status = "in_progress"
+			checkRun.Title = fmt.Sprintf("Syncing: %s", e.Application.Status.OperationState.Message)
+			return &checkRun
 		case synccommon.OperationSucceeded:
-			return &github.CheckRun{
-				Status:     "completed",
-				Conclusion: "success",
-				Title:      fmt.Sprintf("Synced: %s", e.Application.Status.OperationState.Message),
-				Summary:    summary,
-			}
+			checkRun.Status = "completed"
+			checkRun.Conclusion = "success"
+			checkRun.Title = fmt.Sprintf("Synced: %s", e.Application.Status.OperationState.Message)
+			return &checkRun
 		case synccommon.OperationFailed:
-			return &github.CheckRun{
-				Status:     "completed",
-				Conclusion: "failure",
-				Title:      fmt.Sprintf("Sync Failed: %s", e.Application.Status.OperationState.Message),
-				Summary:    summary,
-			}
+			checkRun.Status = "completed"
+			checkRun.Conclusion = "failure"
+			checkRun.Title = fmt.Sprintf("Sync Failed: %s", e.Application.Status.OperationState.Message)
+			return &checkRun
 		case synccommon.OperationError:
-			return &github.CheckRun{
-				Status:     "completed",
-				Conclusion: "failure",
-				Title:      fmt.Sprintf("Sync Error: %s", e.Application.Status.OperationState.Message),
-				Summary:    summary,
-			}
+			checkRun.Status = "completed"
+			checkRun.Conclusion = "failure"
+			checkRun.Title = fmt.Sprintf("Sync Error: %s", e.Application.Status.OperationState.Message)
+			return &checkRun
 		}
 	}
 
 	if e.HealthIsChanged {
 		switch e.Application.Status.Health.Status {
 		case health.HealthStatusProgressing:
-			return &github.CheckRun{
-				Status:  "in_progress",
-				Title:   fmt.Sprintf("Progressing: %s", e.Application.Status.Health.Message),
-				Summary: summary,
-			}
+			checkRun.Status = "in_progress"
+			checkRun.Title = fmt.Sprintf("Progressing: %s", e.Application.Status.Health.Message)
+			return &checkRun
 		case health.HealthStatusHealthy:
-			return &github.CheckRun{
-				Status:     "completed",
-				Conclusion: "success",
-				Title:      fmt.Sprintf("Healthy: %s", e.Application.Status.Health.Message),
-				Summary:    summary,
-			}
+			checkRun.Status = "completed"
+			checkRun.Conclusion = "success"
+			checkRun.Title = fmt.Sprintf("Healthy: %s", e.Application.Status.Health.Message)
+			return &checkRun
 		case health.HealthStatusDegraded:
-			return &github.CheckRun{
-				Status:     "completed",
-				Conclusion: "failure",
-				Title:      fmt.Sprintf("Degraded: %s", e.Application.Status.Health.Message),
-				Summary:    summary,
-			}
+			checkRun.Status = "completed"
+			checkRun.Conclusion = "failure"
+			checkRun.Title = fmt.Sprintf("Degraded: %s", e.Application.Status.Health.Message)
+			return &checkRun
 		}
 	}
 
